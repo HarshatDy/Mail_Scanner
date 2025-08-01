@@ -7,124 +7,353 @@ import os
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
-from pydantic import BaseModel, Field
+from dotenv import load_dotenv
 
 
-class EmailConfig(BaseModel):
-    """Email configuration settings."""
-    provider: str = "gmail"
-    username: str = ""
-    password: str = ""
-    imap_server: str = "imap.gmail.com"
-    imap_port: int = 993
-    smtp_server: str = "smtp.gmail.com"
-    smtp_port: int = 587
-    use_ssl: bool = True
-    use_oauth2: bool = True
+class EmailConfig:
+    """Gmail-specific email configuration settings."""
     
-    # Filtering rules
-    exclude_domains: list = Field(default_factory=list)
-    exclude_keywords: list = Field(default_factory=list)
-    include_categories: list = Field(default_factory=lambda: ["tech", "newsletter", "social", "professional"])
+    def __init__(self):
+        self.provider = "gmail"
+        self.username = ""
+        self.password = ""  # Gmail App Password (not regular password)
+        self.imap_server = "imap.gmail.com"
+        self.imap_port = 993
+        self.smtp_server = "smtp.gmail.com"
+        self.smtp_port = 587
+        self.use_ssl = True
+        self.use_oauth2 = False  # Set to False for App Password authentication
+        
+        # Gmail-specific settings
+        self.gmail_labels = ["INBOX", "Primary", "Social", "Promotions"]
+        self.max_emails_per_scan = 100
+        self.scan_unread_only = False
+        self.days_back = 7
+        
+        # Filtering rules
+        self.exclude_domains = []
+        self.exclude_keywords = []
+        self.include_categories = ["tech", "newsletter", "social", "professional"]
+        
+        # Gmail App Password instructions
+        self.app_password_instructions = """
+        To use Gmail with this scanner, you need to:
+        1. Enable 2-Factor Authentication on your Google account
+        2. Generate an App Password:
+           - Go to Google Account settings
+           - Security > 2-Step Verification > App passwords
+           - Generate a password for 'Mail'
+        3. Use this App Password instead of your regular Gmail password
+        """
+    
+    def to_dict(self):
+        """Convert to dictionary for YAML serialization."""
+        return {
+            'provider': self.provider,
+            'username': self.username,
+            'password': self.password,
+            'imap_server': self.imap_server,
+            'imap_port': self.imap_port,
+            'smtp_server': self.smtp_server,
+            'smtp_port': self.smtp_port,
+            'use_ssl': self.use_ssl,
+            'use_oauth2': self.use_oauth2,
+            'gmail_labels': self.gmail_labels,
+            'max_emails_per_scan': self.max_emails_per_scan,
+            'scan_unread_only': self.scan_unread_only,
+            'days_back': self.days_back,
+            'exclude_domains': self.exclude_domains,
+            'exclude_keywords': self.exclude_keywords,
+            'include_categories': self.include_categories
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        """Create from dictionary."""
+        config = cls()
+        for key, value in data.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        return config
 
 
-class DatabaseConfig(BaseModel):
+class DatabaseConfig:
     """Database configuration settings."""
-    type: str = "sqlite"
-    url: str = "sqlite:///data/emails.db"
-    echo: bool = False
-    pool_size: int = 10
-    max_overflow: int = 20
+    
+    def __init__(self):
+        self.type = "sqlite"
+        self.url = "sqlite:///data/emails.db"
+        self.echo = False
+        self.pool_size = 10
+        self.max_overflow = 20
+    
+    def to_dict(self):
+        return {
+            'type': self.type,
+            'url': self.url,
+            'echo': self.echo,
+            'pool_size': self.pool_size,
+            'max_overflow': self.max_overflow
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        config = cls()
+        for key, value in data.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        return config
 
 
-class AIConfig(BaseModel):
+class AIConfig:
     """AI configuration settings."""
-    provider: str = "gemini"
-    gemini_api_key: str = ""
-    openai_api_key: str = ""
-    model: str = "gemini-pro"
-    max_tokens: int = 1000
-    temperature: float = 0.7
     
-    # Topic generation settings
-    max_topics_per_scan: int = 10
-    min_content_length: int = 100
-    relevance_threshold: float = 0.7
-    categories: list = Field(default_factory=lambda: [
-        "Technology Trends",
-        "Programming & Development", 
-        "AI & Machine Learning",
-        "Startup & Business",
-        "Productivity & Tools"
-    ])
+    def __init__(self):
+        self.provider = "gemini"
+        self.gemini_api_key = ""
+        self.openai_api_key = ""
+        self.model = "gemini-pro"
+        self.max_tokens = 1000
+        self.temperature = 0.7
+        
+        # Topic generation settings
+        self.max_topics_per_scan = 10
+        self.min_content_length = 100
+        self.relevance_threshold = 0.7
+        self.categories = [
+            "Technology Trends",
+            "Programming & Development", 
+            "AI & Machine Learning",
+            "Startup & Business",
+            "Productivity & Tools"
+        ]
+    
+    def to_dict(self):
+        return {
+            'provider': self.provider,
+            'gemini_api_key': self.gemini_api_key,
+            'openai_api_key': self.openai_api_key,
+            'model': self.model,
+            'max_tokens': self.max_tokens,
+            'temperature': self.temperature,
+            'max_topics_per_scan': self.max_topics_per_scan,
+            'min_content_length': self.min_content_length,
+            'relevance_threshold': self.relevance_threshold,
+            'categories': self.categories
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        config = cls()
+        for key, value in data.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        return config
 
 
-class SchedulerConfig(BaseModel):
+class SchedulerConfig:
     """Scheduler configuration settings."""
-    scan_times: list = Field(default_factory=lambda: ["09:00", "18:00"])
-    timezone: str = "UTC"
-    max_retries: int = 3
-    retry_delay: int = 300
+    
+    def __init__(self):
+        self.scan_times = ["09:00", "18:00"]
+        self.timezone = "UTC"
+        self.max_retries = 3
+        self.retry_delay = 300
+    
+    def to_dict(self):
+        return {
+            'scan_times': self.scan_times,
+            'timezone': self.timezone,
+            'max_retries': self.max_retries,
+            'retry_delay': self.retry_delay
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        config = cls()
+        for key, value in data.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        return config
 
 
-class NotificationConfig(BaseModel):
+class NotificationConfig:
     """Notification configuration settings."""
-    enabled: bool = True
-    email_notifications: bool = True
-    slack_webhook: str = ""
-    discord_webhook: str = ""
     
-    # Notification triggers
-    new_topics: bool = True
-    errors: bool = True
-    scan_complete: bool = False
-    weekly_summary: bool = True
+    def __init__(self):
+        self.enabled = True
+        self.email_notifications = True
+        self.slack_webhook = ""
+        self.discord_webhook = ""
+        
+        # Notification triggers
+        self.new_topics = True
+        self.errors = True
+        self.scan_complete = False
+        self.weekly_summary = True
+    
+    def to_dict(self):
+        return {
+            'enabled': self.enabled,
+            'email_notifications': self.email_notifications,
+            'slack_webhook': self.slack_webhook,
+            'discord_webhook': self.discord_webhook,
+            'new_topics': self.new_topics,
+            'errors': self.errors,
+            'scan_complete': self.scan_complete,
+            'weekly_summary': self.weekly_summary
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        config = cls()
+        for key, value in data.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        return config
 
 
-class LoggingConfig(BaseModel):
+class LoggingConfig:
     """Logging configuration settings."""
-    level: str = "INFO"
-    file: str = "logs/email_scanner.log"
-    max_size: str = "10MB"
-    backup_count: int = 5
-    format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-
-
-class ProcessingConfig(BaseModel):
-    """Content processing configuration settings."""
-    max_email_size: str = "10MB"
-    extract_links: bool = True
-    extract_attachments: bool = False
-    clean_html: bool = True
-    remove_duplicates: bool = True
     
-    # Content cleaning
-    remove_html_tags: bool = True
-    remove_urls: bool = False
-    remove_emails: bool = True
-    remove_phone_numbers: bool = True
-    min_word_count: int = 10
+    def __init__(self):
+        self.level = "INFO"
+        self.file = "logs/email_scanner.log"
+        self.max_size = "10MB"
+        self.backup_count = 5
+        self.format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
+    def to_dict(self):
+        return {
+            'level': self.level,
+            'file': self.file,
+            'max_size': self.max_size,
+            'backup_count': self.backup_count,
+            'format': self.format
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        config = cls()
+        for key, value in data.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        return config
 
 
-class WebConfig(BaseModel):
+class ProcessingConfig:
+    """Content processing configuration settings."""
+    
+    def __init__(self):
+        self.max_email_size = "10MB"
+        self.extract_links = True
+        self.extract_attachments = False
+        self.clean_html = True
+        self.remove_duplicates = True
+        
+        # Content cleaning
+        self.remove_html_tags = True
+        self.remove_urls = False
+        self.remove_emails = True
+        self.remove_phone_numbers = True
+        self.min_word_count = 10
+    
+    def to_dict(self):
+        return {
+            'max_email_size': self.max_email_size,
+            'extract_links': self.extract_links,
+            'extract_attachments': self.extract_attachments,
+            'clean_html': self.clean_html,
+            'remove_duplicates': self.remove_duplicates,
+            'remove_html_tags': self.remove_html_tags,
+            'remove_urls': self.remove_urls,
+            'remove_emails': self.remove_emails,
+            'remove_phone_numbers': self.remove_phone_numbers,
+            'min_word_count': self.min_word_count
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        config = cls()
+        for key, value in data.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        return config
+
+
+class WebConfig:
     """Web interface configuration settings."""
-    enabled: bool = False
-    host: str = "0.0.0.0"
-    port: int = 5000
-    debug: bool = False
-    secret_key: str = ""
+    
+    def __init__(self):
+        self.enabled = False
+        self.host = "0.0.0.0"
+        self.port = 5000
+        self.debug = False
+        self.secret_key = ""
+    
+    def to_dict(self):
+        return {
+            'enabled': self.enabled,
+            'host': self.host,
+            'port': self.port,
+            'debug': self.debug,
+            'secret_key': self.secret_key
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        config = cls()
+        for key, value in data.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        return config
 
 
-class AppConfig(BaseModel):
+class AppConfig:
     """Main application configuration."""
-    email: EmailConfig = Field(default_factory=EmailConfig)
-    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
-    ai: AIConfig = Field(default_factory=AIConfig)
-    scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
-    notifications: NotificationConfig = Field(default_factory=NotificationConfig)
-    logging: LoggingConfig = Field(default_factory=LoggingConfig)
-    processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
-    web: WebConfig = Field(default_factory=WebConfig)
+    
+    def __init__(self):
+        self.email = EmailConfig()
+        self.database = DatabaseConfig()
+        self.ai = AIConfig()
+        self.scheduler = SchedulerConfig()
+        self.notifications = NotificationConfig()
+        self.logging = LoggingConfig()
+        self.processing = ProcessingConfig()
+        self.web = WebConfig()
+    
+    def to_dict(self):
+        return {
+            'email': self.email.to_dict(),
+            'database': self.database.to_dict(),
+            'ai': self.ai.to_dict(),
+            'scheduler': self.scheduler.to_dict(),
+            'notifications': self.notifications.to_dict(),
+            'logging': self.logging.to_dict(),
+            'processing': self.processing.to_dict(),
+            'web': self.web.to_dict()
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        config = cls()
+        if 'email' in data:
+            config.email = EmailConfig.from_dict(data['email'])
+        if 'database' in data:
+            config.database = DatabaseConfig.from_dict(data['database'])
+        if 'ai' in data:
+            config.ai = AIConfig.from_dict(data['ai'])
+        if 'scheduler' in data:
+            config.scheduler = SchedulerConfig.from_dict(data['scheduler'])
+        if 'notifications' in data:
+            config.notifications = NotificationConfig.from_dict(data['notifications'])
+        if 'logging' in data:
+            config.logging = LoggingConfig.from_dict(data['logging'])
+        if 'processing' in data:
+            config.processing = ProcessingConfig.from_dict(data['processing'])
+        if 'web' in data:
+            config.web = WebConfig.from_dict(data['web'])
+        return config
 
 
 class ConfigManager:
@@ -136,6 +365,9 @@ class ConfigManager:
     
     def load_config(self) -> AppConfig:
         """Load configuration from YAML file."""
+        # Load environment variables from .env file
+        load_dotenv()
+        
         if not os.path.exists(self.config_path):
             raise FileNotFoundError(f"Configuration file not found: {self.config_path}")
         
@@ -146,7 +378,7 @@ class ConfigManager:
         config_data = self._override_with_env(config_data)
         
         # Validate configuration
-        self.config = AppConfig(**config_data)
+        self.config = AppConfig.from_dict(config_data)
         return self.config
     
     def _override_with_env(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -154,11 +386,16 @@ class ConfigManager:
         env_mappings = {
             'EMAIL_USERNAME': ('email', 'username'),
             'EMAIL_PASSWORD': ('email', 'password'),
+            'EMAIL_IMAP_SERVER': ('email', 'imap_server'),
+            'EMAIL_IMAP_PORT': ('email', 'imap_port'),
+            'EMAIL_SMTP_SERVER': ('email', 'smtp_server'),
+            'EMAIL_SMTP_PORT': ('email', 'smtp_port'),
             'GEMINI_API_KEY': ('ai', 'gemini_api_key'),
             'OPENAI_API_KEY': ('ai', 'openai_api_key'),
             'DATABASE_URL': ('database', 'url'),
             'SLACK_WEBHOOK_URL': ('notifications', 'slack_webhook'),
             'DISCORD_WEBHOOK_URL': ('notifications', 'discord_webhook'),
+            'WEB_SECRET_KEY': ('web', 'secret_key'),
         }
         
         for env_var, config_path in env_mappings.items():
@@ -170,7 +407,16 @@ class ConfigManager:
                     if key not in current:
                         current[key] = {}
                     current = current[key]
-                current[config_path[-1]] = env_value
+                
+                # Convert port numbers to integers
+                if config_path[-1] in ['imap_port', 'smtp_port']:
+                    try:
+                        current[config_path[-1]] = int(env_value)
+                    except ValueError:
+                        print(f"Warning: Invalid port number for {env_var}: {env_value}")
+                        continue
+                else:
+                    current[config_path[-1]] = env_value
         
         return config_data
     
@@ -217,7 +463,7 @@ class ConfigManager:
         default_config = AppConfig()
         
         # Convert to dict for YAML serialization
-        config_dict = default_config.dict()
+        config_dict = default_config.to_dict()
         
         # Create directory if it doesn't exist
         config_dir = os.path.dirname(self.config_path)

@@ -1,10 +1,10 @@
-# Email Scanner & Blog Topic Generator
+# Gmail Email Scanner & Blog Topic Generator
 
-An automated system that scans emails twice daily, categorizes them, and generates blog topics using Gemini API for tech and newsletter content.
+An automated system that scans Gmail accounts, categorizes emails, and generates blog topics using Google's Gemini AI for tech and newsletter content.
 
 ## Features
 
-- 🔍 **Email Scanning**: Connect to Gmail, Outlook, and other email providers
+- 🔍 **Gmail Integration**: Connect to Gmail with secure App Password authentication
 - 🏷️ **Smart Categorization**: Automatically categorize emails into Tech, Newsletter, Social, and Professional
 - 🚫 **Intelligent Filtering**: Exclude personal and banking emails
 - 🤖 **AI-Powered Topics**: Generate blog topics using Google Gemini API
@@ -17,7 +17,8 @@ An automated system that scans emails twice daily, categorizes them, and generat
 ### Prerequisites
 
 - Python 3.9 or higher
-- Gmail account with App Password (or other email provider)
+- Gmail account with 2-Factor Authentication enabled
+- Gmail App Password (see [GMAIL_SETUP.md](GMAIL_SETUP.md))
 - Google Gemini API key
 
 ### Installation
@@ -39,21 +40,58 @@ An automated system that scans emails twice daily, categorizes them, and generat
    pip install -r requirements.txt
    ```
 
-4. **Configure the system**
+4. **Set up the system**
    ```bash
-   cp config.yaml.example config.yaml
-   # Edit config.yaml with your settings
+   python main.py setup
    ```
 
-5. **Set up environment variables**
+5. **Configure your credentials**
    ```bash
-   # Create .env file
-   EMAIL_USERNAME=your_email@gmail.com
-   EMAIL_PASSWORD=your_app_password
-   GEMINI_API_KEY=your_gemini_api_key
+   # Edit config.yaml with your Gmail and Gemini API credentials
+   # See GMAIL_SETUP.md for detailed instructions
    ```
 
 ### Configuration
+
+#### Environment Variables (Recommended)
+
+For security, use the `.env` file to store sensitive configuration:
+
+1. **Copy the example environment file**:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Edit `.env` with your credentials**:
+   ```bash
+   # Email Configuration
+   EMAIL_USERNAME=your_email@gmail.com
+   EMAIL_PASSWORD=your_app_password
+   EMAIL_IMAP_SERVER=imap.gmail.com
+   EMAIL_IMAP_PORT=993
+   EMAIL_SMTP_SERVER=smtp.gmail.com
+   EMAIL_SMTP_PORT=587
+   
+   # AI Configuration
+   GEMINI_API_KEY=your_gemini_api_key
+   OPENAI_API_KEY=your_openai_api_key
+   
+   # Database Configuration
+   DATABASE_URL=sqlite:///data/emails.db
+   
+   # Notification Configuration
+   SLACK_WEBHOOK_URL=your_slack_webhook_url
+   DISCORD_WEBHOOK_URL=your_discord_webhook_url
+   
+   # Web Interface
+   WEB_SECRET_KEY=your_secret_key_here
+   ```
+
+3. **The system will automatically load these environment variables**
+
+**Security Note**: The `.env` file contains sensitive information and is automatically ignored by git. Never commit your actual `.env` file to version control.
+
+#### Direct Configuration (Alternative)
 
 Edit `config.yaml` with your settings:
 
@@ -68,19 +106,29 @@ ai:
 
 ### Running the System
 
-1. **Manual scan**
+1. **Validate your setup**
    ```bash
-   python -m src.scheduler.main --scan-now
+   python main.py validate
    ```
 
-2. **Start scheduler (runs twice daily)**
+2. **Manual scan**
    ```bash
-   python -m src.scheduler.main
+   python main.py scan
    ```
 
-3. **Run with web interface**
+3. **Start scheduler (runs twice daily)**
    ```bash
-   python -m src.web.app
+   python main.py scheduler
+   ```
+
+4. **Check system status**
+   ```bash
+   python main.py status
+   ```
+
+5. **Web interface (optional)**
+   ```bash
+   python main.py web
    ```
 
 ## Project Structure
@@ -105,27 +153,24 @@ Mail_Scanner/
 └── README.md         # This file
 ```
 
-## Email Setup
+## Gmail Setup
 
-### Gmail Setup
+**For detailed Gmail setup instructions, see [GMAIL_SETUP.md](GMAIL_SETUP.md)**
 
-1. Enable 2-Factor Authentication on your Google account
-2. Generate an App Password:
-   - Go to Google Account settings
+### Quick Gmail Setup
+
+1. **Enable 2-Factor Authentication** on your Google account
+2. **Generate an App Password**:
+   - Go to [Google Account Security](https://myaccount.google.com/security)
    - Security → 2-Step Verification → App passwords
    - Generate password for "Mail"
-3. Use the generated password in your configuration
+3. **Use the App Password** in your configuration (NOT your regular password)
 
-### Other Email Providers
+### Important Notes
 
-The system supports IMAP connections to most email providers. Update the configuration with your provider's settings:
-
-```yaml
-email:
-  provider: outlook  # or yahoo, custom
-  imap_server: outlook.office365.com
-  imap_port: 993
-```
+- You **must** use an App Password, not your regular Gmail password
+- 2-Factor Authentication is required to generate App Passwords
+- The system is specifically optimized for Gmail's IMAP interface
 
 ## AI Integration
 
@@ -231,12 +276,12 @@ mypy src/
 ### Common Issues
 
 1. **Email Connection Failed**
-   - Check credentials in config.yaml
+   - Check credentials in `.env` file or `config.yaml`
    - Verify App Password for Gmail
    - Check firewall settings
 
 2. **Gemini API Errors**
-   - Verify API key is correct
+   - Verify API key is correct in `.env` file or `config.yaml`
    - Check API quota limits
    - Ensure internet connection
 

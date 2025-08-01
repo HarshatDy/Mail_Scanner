@@ -12,23 +12,37 @@ from pathlib import Path
 # Add src to Python path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from config.config_manager import ConfigManager, get_config
-from utils.logger import get_logger, log_info, log_error
+from src.config.config_manager import ConfigManager, get_config
+from src.utils.logger import get_logger, log_info, log_error
 
 
 def setup_command(args):
-    """Set up the initial configuration."""
+    """Set up the initial configuration for Gmail."""
     logger = get_logger("setup")
     
     try:
         config_manager = ConfigManager()
         config_manager.create_default_config()
         
+        logger.info("=== Gmail Email Scanner Setup ===")
         logger.info("Default configuration created. Please edit config.yaml with your settings.")
-        logger.info("Required settings:")
-        logger.info("  - email.username: Your email address")
-        logger.info("  - email.password: Your email password/app password")
-        logger.info("  - ai.gemini_api_key: Your Gemini API key")
+        logger.info("")
+        logger.info("REQUIRED GMAIL SETTINGS:")
+        logger.info("1. Enable 2-Factor Authentication on your Google account")
+        logger.info("2. Generate a Gmail App Password:")
+        logger.info("   - Go to https://myaccount.google.com/security")
+        logger.info("   - Enable 2-Step Verification if not already enabled")
+        logger.info("   - Go to 'App passwords' (under 2-Step Verification)")
+        logger.info("   - Select 'Mail' and generate a password")
+        logger.info("")
+        logger.info("3. Update config.yaml with:")
+        logger.info("   - email.username: Your Gmail address (e.g., yourname@gmail.com)")
+        logger.info("   - email.password: The App Password you generated (NOT your regular password)")
+        logger.info("   - ai.gemini_api_key: Your Gemini API key from https://makersuite.google.com/app/apikey")
+        logger.info("")
+        logger.info("4. Optional: Customize filtering settings in config.yaml")
+        logger.info("")
+        logger.info("After setup, run: python main.py validate")
         
         return True
     except Exception as e:
@@ -37,17 +51,32 @@ def setup_command(args):
 
 
 def validate_command(args):
-    """Validate the current configuration."""
+    """Validate the current configuration and test Gmail connection."""
     logger = get_logger("validate")
     
     try:
         config_manager = ConfigManager()
-        if config_manager.validate_config():
-            logger.info("Configuration is valid!")
-            return True
-        else:
+        if not config_manager.validate_config():
             logger.error("Configuration validation failed. Please check your settings.")
             return False
+        
+        logger.info("Configuration is valid!")
+        logger.info("Testing Gmail connection...")
+        
+        # Test Gmail connection
+        from email_processing.connector import GmailConnector
+        
+        connector = GmailConnector()
+        if connector.test_connection():
+            logger.info("✅ Gmail connection successful!")
+            logger.info("✅ Configuration is ready to use.")
+            return True
+        else:
+            logger.error("❌ Gmail connection failed!")
+            logger.error("Please check your username and App Password.")
+            logger.error("Remember: Use App Password, not your regular Gmail password.")
+            return False
+            
     except Exception as e:
         log_error(e, "validate")
         return False
@@ -102,7 +131,7 @@ def status_command(args):
     
     try:
         # Import here to avoid circular imports
-        from database.operations import get_statistics
+        from src.database.operations import get_statistics
         
         stats = get_statistics()
         
@@ -130,10 +159,14 @@ def web_command(args):
             return False
         
         # Import here to avoid circular imports
-        from web.app import create_app
+        from web.app import create_app, create_basic_templates
+        
+        # Create templates if they don't exist
+        create_basic_templates()
         
         app = create_app()
         logger.info(f"Starting web interface on {config.web.host}:{config.web.port}")
+        logger.info(f"Open your browser to: http://{config.web.host}:{config.web.port}")
         
         app.run(
             host=config.web.host,
