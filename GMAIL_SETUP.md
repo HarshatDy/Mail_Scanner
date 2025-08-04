@@ -1,31 +1,31 @@
-# Gmail Setup Guide for Email Scanner
+# Gmail API Setup Guide for Email Scanner
 
-This guide will help you set up the Email Scanner to work with your Gmail account.
+This guide will help you set up the Email Scanner to work with your Gmail account using the Gmail API.
 
 ## Prerequisites
 
 - A Gmail account
-- 2-Factor Authentication enabled on your Google account
 - Python 3.9+ installed
 - Gemini API key (for AI features)
 
-## Step 1: Enable 2-Factor Authentication
+## Step 1: Enable Gmail API
 
-1. Go to [Google Account Security](https://myaccount.google.com/security)
-2. Click on "2-Step Verification"
-3. Follow the prompts to enable 2-Factor Authentication
-4. Make sure to add a backup phone number
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the Gmail API:
+   - Go to "APIs & Services" > "Library"
+   - Search for "Gmail API"
+   - Click on "Gmail API" and then "Enable"
 
-## Step 2: Generate Gmail App Password
+## Step 2: Create OAuth 2.0 Credentials
 
-**Important**: You cannot use your regular Gmail password. You must generate an App Password.
-
-1. Go to [Google Account Security](https://myaccount.google.com/security)
-2. Under "2-Step Verification", click on "App passwords"
-3. Select "Mail" from the dropdown
-4. Click "Generate"
-5. Copy the 16-character password that appears
-6. **Save this password securely** - you'll need it for the configuration
+1. In the Google Cloud Console, go to "APIs & Services" > "Credentials"
+2. Click "Create Credentials" > "OAuth 2.0 Client IDs"
+3. Choose "Desktop application" as the application type
+4. Give it a name (e.g., "Email Scanner")
+5. Click "Create"
+6. Download the credentials file (it will be named something like `client_secret_xxxxx.json`)
+7. Rename it to `credentials.json` and place it in the project root directory
 
 ## Step 3: Get Gemini API Key
 
@@ -47,17 +47,27 @@ This guide will help you set up the Email Scanner to work with your Gmail accoun
    python main.py setup
    ```
 
-4. Edit the `config.yaml` file with your credentials:
+4. Edit the `config.yaml` file with your settings:
    ```yaml
    email:
-     username: "yourname@gmail.com"
-     password: "your-16-character-app-password"
+     use_gmail_api: true
+     credentials_file: "credentials.json"
+     token_file: "token.json"
    
    ai:
      gemini_api_key: "your-gemini-api-key"
    ```
 
-## Step 5: Validate Configuration
+## Step 5: First Authentication
+
+When you run the application for the first time, it will:
+
+1. Open your default web browser
+2. Ask you to sign in to your Google account
+3. Request permission to access your Gmail
+4. Create a `token.json` file for future use
+
+## Step 6: Validate Configuration
 
 Test your setup:
 ```bash
@@ -66,11 +76,11 @@ python main.py validate
 
 You should see:
 ```
-✅ Gmail connection successful!
+✅ Gmail API connection successful!
 ✅ Configuration is ready to use.
 ```
 
-## Step 6: Run Your First Scan
+## Step 7: Run Your First Scan
 
 Test the email scanner:
 ```bash
@@ -83,8 +93,9 @@ python main.py scan
 
 ```yaml
 email:
-  username: "yourname@gmail.com"
-  password: "your-app-password"
+  use_gmail_api: true
+  credentials_file: "credentials.json"
+  token_file: "token.json"
   max_emails_per_scan: 100
   scan_unread_only: false
   days_back: 7
@@ -126,17 +137,23 @@ ai:
 
 ## Troubleshooting
 
+### "Credentials file not found" error
+
+- Make sure `credentials.json` is in the project root directory
+- Verify the file name is exactly `credentials.json`
+- Check that the file contains valid OAuth 2.0 credentials
+
 ### "Authentication failed" error
 
-- Make sure you're using an App Password, not your regular Gmail password
-- Verify that 2-Factor Authentication is enabled
-- Check that the App Password was generated for "Mail"
+- Delete the `token.json` file and try again
+- Make sure you're using the correct Google account
+- Verify that Gmail API is enabled in your Google Cloud project
 
-### "Connection failed" error
+### "Permission denied" error
 
-- Check your internet connection
-- Verify the Gmail IMAP settings are correct
-- Make sure your Gmail account allows IMAP access
+- Make sure you granted the necessary permissions during OAuth flow
+- Check that your Google account has access to Gmail
+- Verify that the OAuth consent screen is configured properly
 
 ### "No emails found" message
 
@@ -146,15 +163,15 @@ ai:
 
 ### Rate limiting issues
 
-- Gmail has rate limits for IMAP connections
+- Gmail API has rate limits (1,000,000,000 queries per 100 seconds per user)
 - The scanner includes built-in delays to respect these limits
 - If you encounter issues, try reducing `max_emails_per_scan`
 
 ## Security Notes
 
-- **Never commit your config.yaml file to version control**
-- Store your App Password securely
-- The App Password is specific to this application and can be revoked if needed
+- **Never commit your credentials.json or token.json files to version control**
+- Store your credentials securely
+- The OAuth token can be revoked if needed
 - Consider using environment variables for sensitive data
 
 ## Environment Variables
@@ -162,8 +179,9 @@ ai:
 You can also set credentials via environment variables:
 
 ```bash
-export EMAIL_USERNAME="yourname@gmail.com"
-export EMAIL_PASSWORD="your-app-password"
+export EMAIL_USE_GMAIL_API="true"
+export EMAIL_CREDENTIALS_FILE="credentials.json"
+export EMAIL_TOKEN_FILE="token.json"
 export GEMINI_API_KEY="your-gemini-api-key"
 ```
 
@@ -173,8 +191,8 @@ export GEMINI_API_KEY="your-gemini-api-key"
 
 You can customize the email categorization by modifying the patterns in the code:
 
-- `src/email/filter.py` - Email filtering and categorization
-- `src/email/categorizer.py` - Content analysis
+- `src/email_processing/filter.py` - Email filtering and categorization
+- `src/email_processing/categorizer.py` - Content analysis
 
 ### Scheduling
 
@@ -209,11 +227,21 @@ If you encounter issues:
 1. Check the logs in the `logs/` directory
 2. Run `python main.py validate` to test your configuration
 3. Ensure all prerequisites are met
-4. Verify your Gmail settings
+4. Verify your Google Cloud Console settings
 
 ## Privacy
 
-- The scanner only reads emails, it never sends emails
+- The scanner only reads emails, it never sends emails unless configured
 - Email content is processed locally
 - No email data is stored permanently unless configured
-- The Gemini API processes content for topic generation 
+- The Gemini API processes content for topic generation
+- OAuth tokens are stored locally and can be revoked at any time
+
+## Migration from SMTP/IMAP
+
+If you were previously using SMTP with app passwords:
+
+1. Set `use_gmail_api: true` in your config
+2. Follow the Gmail API setup steps above
+3. Remove the old username/password configuration
+4. The application will automatically use Gmail API instead of SMTP/IMAP 

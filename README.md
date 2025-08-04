@@ -4,21 +4,23 @@ An automated system that scans Gmail accounts, categorizes emails, and generates
 
 ## Features
 
-- 🔍 **Gmail Integration**: Connect to Gmail with secure App Password authentication
+- 🔍 **Gmail API Integration**: Connect to Gmail using secure OAuth2 authentication
 - 🏷️ **Smart Categorization**: Automatically categorize emails into Tech, Newsletter, Social, and Professional
 - 🚫 **Intelligent Filtering**: Exclude personal and banking emails
 - 🤖 **AI-Powered Topics**: Generate blog topics using Google Gemini API
 - ⏰ **Automated Scheduling**: Run scans twice daily at configurable times
 - 📊 **Content Analysis**: Extract and analyze relevant content from emails
 - 🔔 **Notifications**: Get notified about new topics and system status
+- 📧 **Email Sending**: Send emails using Gmail API (no SMTP required)
 
 ## Quick Start
 
 ### Prerequisites
 
 - Python 3.9 or higher
-- Gmail account with 2-Factor Authentication enabled
-- Gmail App Password (see [GMAIL_SETUP.md](GMAIL_SETUP.md))
+- Gmail account
+- Google Cloud Console project with Gmail API enabled
+- OAuth 2.0 credentials (see [GMAIL_SETUP.md](GMAIL_SETUP.md))
 - Google Gemini API key
 
 ### Installation
@@ -47,7 +49,7 @@ An automated system that scans Gmail accounts, categorizes emails, and generates
 
 5. **Configure your credentials**
    ```bash
-   # Edit config.yaml with your Gmail and Gemini API credentials
+   # Edit config.yaml with your Gmail API and Gemini API credentials
    # See GMAIL_SETUP.md for detailed instructions
    ```
 
@@ -64,13 +66,10 @@ For security, use the `.env` file to store sensitive configuration:
 
 2. **Edit `.env` with your credentials**:
    ```bash
-   # Email Configuration
-   EMAIL_USERNAME=your_email@gmail.com
-   EMAIL_PASSWORD=your_app_password
-   EMAIL_IMAP_SERVER=imap.gmail.com
-   EMAIL_IMAP_PORT=993
-   EMAIL_SMTP_SERVER=smtp.gmail.com
-   EMAIL_SMTP_PORT=587
+   # Email Configuration (Gmail API)
+   EMAIL_USE_GMAIL_API=true
+   EMAIL_CREDENTIALS_FILE=credentials.json
+   EMAIL_TOKEN_FILE=token.json
    
    # AI Configuration
    GEMINI_API_KEY=your_gemini_api_key
@@ -97,8 +96,9 @@ Edit `config.yaml` with your settings:
 
 ```yaml
 email:
-  username: your_email@gmail.com
-  password: your_app_password
+  use_gmail_api: true
+  credentials_file: "credentials.json"
+  token_file: "token.json"
   
 ai:
   gemini_api_key: your_gemini_api_key
@@ -153,24 +153,26 @@ Mail_Scanner/
 └── README.md         # This file
 ```
 
-## Gmail Setup
+## Gmail API Setup
 
-**For detailed Gmail setup instructions, see [GMAIL_SETUP.md](GMAIL_SETUP.md)**
+**For detailed Gmail API setup instructions, see [GMAIL_SETUP.md](GMAIL_SETUP.md)**
 
-### Quick Gmail Setup
+### Quick Gmail API Setup
 
-1. **Enable 2-Factor Authentication** on your Google account
-2. **Generate an App Password**:
-   - Go to [Google Account Security](https://myaccount.google.com/security)
-   - Security → 2-Step Verification → App passwords
-   - Generate password for "Mail"
-3. **Use the App Password** in your configuration (NOT your regular password)
+1. **Enable Gmail API** in Google Cloud Console
+2. **Create OAuth 2.0 credentials**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - APIs & Services → Credentials
+   - Create OAuth 2.0 Client ID for Desktop application
+   - Download credentials.json file
+3. **Place credentials.json** in the project root directory
 
 ### Important Notes
 
-- You **must** use an App Password, not your regular Gmail password
-- 2-Factor Authentication is required to generate App Passwords
-- The system is specifically optimized for Gmail's IMAP interface
+- You **must** use OAuth 2.0 credentials, not username/password
+- The system uses Gmail API for both reading and sending emails
+- No SMTP or IMAP configuration required
+- First run will open browser for OAuth2 authorization
 
 ## AI Integration
 

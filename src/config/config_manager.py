@@ -24,6 +24,11 @@ class EmailConfig:
         self.use_ssl = True
         self.use_oauth2 = False  # Set to False for App Password authentication
         
+        # Gmail API settings
+        self.use_gmail_api = True  # Use Gmail API instead of SMTP/IMAP
+        self.credentials_file = "credentials.json"  # Path to Google API credentials
+        self.token_file = "token.json"  # Path to store OAuth2 token
+        
         # Gmail-specific settings
         self.gmail_labels = ["INBOX", "Primary", "Social", "Promotions"]
         self.max_emails_per_scan = 100
@@ -35,15 +40,19 @@ class EmailConfig:
         self.exclude_keywords = []
         self.include_categories = ["tech", "newsletter", "social", "professional"]
         
-        # Gmail App Password instructions
-        self.app_password_instructions = """
-        To use Gmail with this scanner, you need to:
-        1. Enable 2-Factor Authentication on your Google account
-        2. Generate an App Password:
-           - Go to Google Account settings
-           - Security > 2-Step Verification > App passwords
-           - Generate a password for 'Mail'
-        3. Use this App Password instead of your regular Gmail password
+        # Gmail API setup instructions
+        self.gmail_api_instructions = """
+        To use Gmail API with this scanner, you need to:
+        1. Go to Google Cloud Console (https://console.cloud.google.com/)
+        2. Create a new project or select existing one
+        3. Enable Gmail API for your project
+        4. Create OAuth 2.0 credentials:
+           - Go to APIs & Services > Credentials
+           - Click "Create Credentials" > "OAuth 2.0 Client IDs"
+           - Choose "Desktop application"
+           - Download the credentials.json file
+        5. Place credentials.json in the project root directory
+        6. Run the application - it will open browser for OAuth2 authorization
         """
     
     def to_dict(self):
@@ -58,6 +67,9 @@ class EmailConfig:
             'smtp_port': self.smtp_port,
             'use_ssl': self.use_ssl,
             'use_oauth2': self.use_oauth2,
+            'use_gmail_api': self.use_gmail_api,
+            'credentials_file': self.credentials_file,
+            'token_file': self.token_file,
             'gmail_labels': self.gmail_labels,
             'max_emails_per_scan': self.max_emails_per_scan,
             'scan_unread_only': self.scan_unread_only,
@@ -112,7 +124,7 @@ class AIConfig:
         self.provider = "gemini"
         self.gemini_api_key = ""
         self.openai_api_key = ""
-        self.model = "gemini-pro"
+        self.model = "gemini-2.0-flash-lite"
         self.max_tokens = 1000
         self.temperature = 0.7
         
@@ -183,6 +195,7 @@ class NotificationConfig:
     def __init__(self):
         self.enabled = True
         self.email_notifications = True
+        self.notification_email = ""
         self.slack_webhook = ""
         self.discord_webhook = ""
         
@@ -196,6 +209,7 @@ class NotificationConfig:
         return {
             'enabled': self.enabled,
             'email_notifications': self.email_notifications,
+            'notification_email': self.notification_email,
             'slack_webhook': self.slack_webhook,
             'discord_webhook': self.discord_webhook,
             'new_topics': self.new_topics,
@@ -390,12 +404,16 @@ class ConfigManager:
             'EMAIL_IMAP_PORT': ('email', 'imap_port'),
             'EMAIL_SMTP_SERVER': ('email', 'smtp_server'),
             'EMAIL_SMTP_PORT': ('email', 'smtp_port'),
+            'EMAIL_USE_GMAIL_API': ('email', 'use_gmail_api'),
+            'EMAIL_CREDENTIALS_FILE': ('email', 'credentials_file'),
+            'EMAIL_TOKEN_FILE': ('email', 'token_file'),
             'GEMINI_API_KEY': ('ai', 'gemini_api_key'),
             'OPENAI_API_KEY': ('ai', 'openai_api_key'),
             'DATABASE_URL': ('database', 'url'),
             'SLACK_WEBHOOK_URL': ('notifications', 'slack_webhook'),
             'DISCORD_WEBHOOK_URL': ('notifications', 'discord_webhook'),
             'WEB_SECRET_KEY': ('web', 'secret_key'),
+             'NOTIFICATION_EMAIL': ('notifications', 'notification_email'),
         }
         
         for env_var, config_path in env_mappings.items():
@@ -436,12 +454,18 @@ class ConfigManager:
         try:
             config = self.get_config()
             
-            # Check required fields
-            if not config.email.username:
-                raise ValueError("Email username is required")
-            
-            if not config.email.password:
-                raise ValueError("Email password is required")
+            # Check required fields based on email provider
+            if config.email.use_gmail_api:
+                # For Gmail API, we need credentials file
+                if not os.path.exists(config.email.credentials_file):
+                    raise ValueError(f"Gmail API credentials file not found: {config.email.credentials_file}")
+            else:
+                # For SMTP/IMAP, we need username and password
+                if not config.email.username:
+                    raise ValueError("Email username is required for SMTP/IMAP")
+                
+                if not config.email.password:
+                    raise ValueError("Email password is required for SMTP/IMAP")
             
             if config.ai.provider == "gemini" and not config.ai.gemini_api_key:
                 raise ValueError("Gemini API key is required when using Gemini provider")

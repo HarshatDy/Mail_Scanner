@@ -1,0 +1,94 @@
+# Email Scanner Configuration Example
+# Copy this file to config.yaml and update with your settings
+
+email:
+  # Gmail API Configuration (Recommended)
+  use_gmail_api: true
+  credentials_file: "credentials.json"  # Download from Google Cloud Console
+  token_file: "token.json"             # Created automatically after OAuth
+  
+  # Legacy IMAP/SMTP Configuration (Alternative)
+  # use_gmail_api: false
+  # username: "your_email@gmail.com"
+  # password: "your_app_password"
+  # imap_server: "imap.gmail.com"
+  # imap_port: 993
+  # smtp_server: "smtp.gmail.com"
+  # smtp_port: 587
+  # use_ssl: true
+  # use_oauth2: false
+  
+  # Email Processing Settings
+  max_emails_per_scan: 100
+  scan_unread_only: false
+  days_back: 7
+  gmail_labels: ["INBOX", "Primary", "Social", "Promotions"]
+  
+  # Filtering Rules
+  exclude_domains:
+    - "bank.com"
+    - "paypal.com"
+    - "amazon.com"
+    - "ebay.com"
+  
+  exclude_keywords:
+    - "unsubscribe"
+    - "spam"
+    - "promotion"
+    - "sale"
+    - "discount"
+  
+  include_categories:
+    - "tech"
+    - "newsletter"
+    - "social"
+    - "professional"
+
+ai:
+  provider: "gemini"  # Options: "gemini", "openai"
+  gemini_api_key: "your_gemini_api_key_here"
+  openai_api_key: "your_openai_api_key_here"
+  model: "gemini-pro"
+  max_tokens: 1000
+  temperature: 0.7
+  max_topics_per_scan: 10
+
+database:
+  type: "sqlite"
+  url: "sqlite:///data/emails.db"
+  echo: false
+  pool_size: 10
+  max_overflow: 20
+
+scheduler:
+  enabled: true
+  morning_time: "09:00"
+  evening_time: "18:00"
+  timezone: "UTC"
+
+notifications:
+  enabled: true
+  slack_webhook: "your_slack_webhook_url"
+  discord_webhook: "your_discord_webhook_url"
+  email_notifications: false
+  notification_email: "your_email@gmail.com"
+
+logging:
+  level: "INFO"
+  file: "logs/email_scanner.log"
+  max_size: "10MB"
+  backup_count: 5
+
+processing:
+  extract_links: true
+  extract_hashtags: true
+  min_content_length: 50
+  max_content_length: 5000
+  language: "en"
+
+web:
+  enabled: false
+  host: "0.0.0.0"
+  port: 5000
+  secret_key: "your_secret_key_here"
+  debug: false 

@@ -1,6 +1,6 @@
 """
 Gmail email connector for the Email Scanner system.
-Handles IMAP connections with OAuth2 authentication and Gmail-specific settings.
+Handles both IMAP connections and Gmail API with OAuth2 authentication.
 """
 
 import imaplib
@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 
 from src.config.config_manager import get_config
 from src.utils.logger import get_logger
+from src.email_processing.gmail_api_connector import GmailAPIConnector
 
 
 class GmailConnector:
@@ -25,8 +26,16 @@ class GmailConnector:
         self.logger = get_logger("gmail_connector")
         self.imap_connection: Optional[imaplib.IMAP4_SSL] = None
         self.smtp_connection = None
+        self.gmail_api = GmailAPIConnector() if self.config.email.use_gmail_api else None
         
     def connect(self) -> bool:
+        """Establish connection to Gmail (IMAP or API)."""
+        if self.config.email.use_gmail_api:
+            return self.gmail_api.authenticate()
+        else:
+            return self._connect_imap()
+    
+    def _connect_imap(self) -> bool:
         """Establish connection to Gmail IMAP server."""
         try:
             # Create SSL context for secure connection
@@ -45,36 +54,42 @@ class GmailConnector:
                 self.config.email.password
             )
             
-            self.logger.info(f"Successfully connected to Gmail as {self.config.email.username}")
+            self.logger.info(f"Successfully connected to Gmail IMAP as {self.config.email.username}")
             return True
             
         except imaplib.IMAP4.error as e:
             self.logger.error(f"IMAP authentication failed: {e}")
             return False
         except Exception as e:
-            self.logger.error(f"Connection failed: {e}")
+            self.logger.error(f"IMAP connection failed: {e}")
             return False
     
     def disconnect(self):
-        """Close the IMAP connection."""
-        if self.imap_connection:
+        """Close the connection (IMAP or API)."""
+        if self.config.email.use_gmail_api:
+            # Gmail API doesn't require explicit disconnection
+            self.logger.info("Gmail API connection closed")
+        elif self.imap_connection:
             try:
                 self.imap_connection.logout()
                 self.logger.info("IMAP connection closed")
             except Exception as e:
-                self.logger.error(f"Error closing connection: {e}")
+                self.logger.error(f"Error closing IMAP connection: {e}")
             finally:
                 self.imap_connection = None
     
     def get_email_count(self, folder: str = "INBOX") -> int:
         """Get the number of emails in a folder."""
-        try:
-            self.imap_connection.select(folder)
-            _, messages = self.imap_connection.search(None, "ALL")
-            return len(messages[0].split())
-        except Exception as e:
-            self.logger.error(f"Error getting email count: {e}")
-            return 0
+        if self.config.email.use_gmail_api:
+            return self.gmail_api.get_email_count(f"in:{folder.lower()}")
+        else:
+            try:
+                self.imap_connection.select(folder)
+                _, messages = self.imap_connection.search(None, "ALL")
+                return len(messages[0].split())
+            except Exception as e:
+                self.logger.error(f"Error getting email count: {e}")
+                return 0
     
     def fetch_emails(self, 
                     folder: str = "INBOX", 
@@ -93,6 +108,22 @@ class GmailConnector:
         Returns:
             List of email dictionaries with metadata and content
         """
+        if self.config.email.use_gmail_api:
+            return self.gmail_api.fetch_emails(
+                query=f"in:{folder.lower()}",
+                limit=limit,
+                days_back=days_back,
+                unread_only=unread_only
+            )
+        else:
+            return self._fetch_emails_imap(folder, limit, days_back, unread_only)
+    
+    def _fetch_emails_imap(self, 
+                          folder: str = "INBOX", 
+                          limit: int = 50, 
+                          days_back: int = 7,
+                          unread_only: bool = False) -> List[Dict[str, Any]]:
+        """Fetch emails using IMAP."""
         emails = []
         
         try:
@@ -250,68 +281,82 @@ class GmailConnector:
     
     def mark_as_read(self, email_uids: List[str], folder: str = "INBOX") -> bool:
         """Mark emails as read."""
-        try:
-            self.imap_connection.select(folder)
-            
-            for uid in email_uids:
-                self.imap_connection.store(uid, '+FLAGS', '\\Seen')
-            
-            self.logger.info(f"Marked {len(email_uids)} emails as read")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Error marking emails as read: {e}")
-            return False
+        if self.config.email.use_gmail_api:
+            return self.gmail_api.mark_as_read(email_uids)
+        else:
+            try:
+                self.imap_connection.select(folder)
+                
+                for uid in email_uids:
+                    self.imap_connection.store(uid, '+FLAGS', '\\Seen')
+                
+                self.logger.info(f"Marked {len(email_uids)} emails as read")
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"Error marking emails as read: {e}")
+                return False
     
     def move_to_folder(self, email_uids: List[str], source_folder: str, target_folder: str) -> bool:
         """Move emails to a different folder."""
-        try:
-            self.imap_connection.select(source_folder)
-            
-            for uid in email_uids:
-                self.imap_connection.store(uid, '+X-GM-LABELS', target_folder)
-            
-            self.logger.info(f"Moved {len(email_uids)} emails to {target_folder}")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Error moving emails: {e}")
-            return False
+        if self.config.email.use_gmail_api:
+            return self.gmail_api.add_label(email_uids, target_folder)
+        else:
+            try:
+                self.imap_connection.select(source_folder)
+                
+                for uid in email_uids:
+                    self.imap_connection.store(uid, '+X-GM-LABELS', target_folder)
+                
+                self.logger.info(f"Moved {len(email_uids)} emails to {target_folder}")
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"Error moving emails: {e}")
+                return False
     
     def get_folders(self) -> List[str]:
         """Get list of available folders/labels."""
-        try:
-            _, folders = self.imap_connection.list()
-            folder_names = []
-            
-            for folder in folders:
-                folder_name = folder.decode().split('"')[-2]
-                if folder_name:
-                    folder_names.append(folder_name)
-            
-            return folder_names
-            
-        except Exception as e:
-            self.logger.error(f"Error getting folders: {e}")
-            return []
+        if self.config.email.use_gmail_api:
+            labels = self.gmail_api.get_labels()
+            return [label['name'] for label in labels if label['type'] == 'user']
+        else:
+            try:
+                _, folders = self.imap_connection.list()
+                folder_names = []
+                
+                for folder in folders:
+                    folder_name = folder.decode().split('"')[-2]
+                    if folder_name:
+                        folder_names.append(folder_name)
+                
+                return folder_names
+                
+            except Exception as e:
+                self.logger.error(f"Error getting folders: {e}")
+                return []
     
     def test_connection(self) -> bool:
         """Test the Gmail connection and authentication."""
         try:
-            if not self.connect():
-                return False
-            
-            # Try to get email count as a test
-            count = self.get_email_count()
-            self.logger.info(f"Connection test successful. Found {count} emails in inbox.")
-            
-            return True
-            
+            if self.config.email.use_gmail_api:
+                return self.gmail_api.test_connection()
+            else:
+                if not self.connect():
+                    return False
+                
+                # Try to get email count as a test
+                count = self.get_email_count()
+                self.logger.info(f"Connection test successful. Found {count} emails in inbox.")
+                
+                return True
+                
         except Exception as e:
             self.logger.error(f"Connection test failed: {e}")
             return False
         finally:
-            self.disconnect()
+            if not self.config.email.use_gmail_api:
+                self.disconnect()
 
 
 # Import email.header at the top level
