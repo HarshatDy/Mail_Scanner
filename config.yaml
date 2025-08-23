@@ -1,0 +1,119 @@
+# Gmail Email Scanner Configuration
+
+# Email Configuration
+email:
+  provider: gmail
+  username: ${EMAIL_USERNAME}
+  password: ${EMAIL_PASSWORD}
+  imap_server: ${EMAIL_IMAP_SERVER}
+  imap_port: ${EMAIL_IMAP_PORT}
+  smtp_server: ${EMAIL_SMTP_SERVER}
+  smtp_port: ${EMAIL_SMTP_PORT}
+  use_ssl: true
+  use_oauth2: false
+  
+  # Gmail-specific settings
+  gmail_labels:
+    - INBOX
+    - Primary
+    - Social
+    - Promotions
+  max_emails_per_scan: 100
+  scan_unread_only: false
+  days_back: 7
+  
+  # Filtering rules
+  exclude_domains:
+    - bank.com
+    - paypal.com
+    - chase.com
+    - wells-fargo.com
+    - personal.com
+  exclude_keywords:
+    - "personal"
+    - "bank statement"
+    - "credit card"
+    - "account balance"
+    - "password reset"
+  include_categories:
+    - tech
+    - newsletter
+    - social
+    - professional
+
+# Database Configuration
+database:
+  type: sqlite
+  url: ${DATABASE_URL}
+  echo: false
+  pool_size: 10
+  max_overflow: 20
+
+# AI Configuration
+ai:
+  provider: gemini
+  gemini_api_key: ${GEMINI_API_KEY}
+  openai_api_key: ${OPENAI_API_KEY}
+  model: gemini-2.0-flash-lite
+  max_tokens: 1000
+  temperature: 0.7
+  max_topics_per_scan: 10
+  min_content_length: 100
+  relevance_threshold: 0.7
+  categories:
+    - "Technology Trends"
+    - "Programming & Development"
+    - "AI & Machine Learning"
+    - "Startup & Business"
+    - "Productivity & Tools"
+
+# Scheduler Configuration
+scheduler:
+  scan_times:
+    - "07:18"
+    - "10:24"
+    - "22:36"
+  timezone: Asia/Kolkata
+  max_retries: 3
+  retry_delay: 300
+
+# Notification Configuration
+notifications:
+  enabled: true
+  email_notifications: true
+  notification_email: ${NOTIFICATION_EMAIL}
+  slack_webhook: ${SLACK_WEBHOOK_URL}
+  discord_webhook: ${DISCORD_WEBHOOK_URL}
+  new_topics: true
+  errors: true
+  scan_complete: false
+  weekly_summary: true
+
+# Logging Configuration
+logging:
+  level: INFO
+  file: logs/email_scanner.log
+  max_size: 10MB
+  backup_count: 5
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Content Processing
+processing:
+  max_email_size: 10MB
+  extract_links: true
+  extract_attachments: false
+  clean_html: true
+  remove_duplicates: true
+  remove_html_tags: true
+  remove_urls: false
+  remove_emails: true
+  remove_phone_numbers: true
+  min_word_count: 10
+
+# Web Interface
+web:
+  enabled: false
+  host: 0.0.0.0
+  port: 5000
+  debug: false
+  secret_key: ${WEB_SECRET_KEY} 
