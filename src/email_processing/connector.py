@@ -95,7 +95,8 @@ class GmailConnector:
                     folder: str = "INBOX", 
                     limit: int = 50, 
                     days_back: int = 7,
-                    unread_only: bool = False) -> List[Dict[str, Any]]:
+                    unread_only: bool = False,
+                    random_dates: bool = False) -> List[Dict[str, Any]]:
         """
         Fetch emails from Gmail with filtering options.
         
@@ -113,7 +114,8 @@ class GmailConnector:
                 query=f"in:{folder.lower()}",
                 limit=limit,
                 days_back=days_back,
-                unread_only=unread_only
+                unread_only=unread_only,
+                random_dates=random_dates
             )
         else:
             return self._fetch_emails_imap(folder, limit, days_back, unread_only)
@@ -122,7 +124,8 @@ class GmailConnector:
                           folder: str = "INBOX", 
                           limit: int = 50, 
                           days_back: int = 7,
-                          unread_only: bool = False) -> List[Dict[str, Any]]:
+                          unread_only: bool = False,
+                          random_dates: bool = False) -> List[Dict[str, Any]]:
         """Fetch emails using IMAP."""
         emails = []
         
@@ -138,7 +141,11 @@ class GmailConnector:
             
             # Add date filter
             if days_back > 0:
-                date_since = (datetime.now() - timedelta(days=days_back)).strftime("%d-%b-%Y")
+                if random_dates:
+                    # For random dates, use a wider range
+                    date_since = (datetime.now() - timedelta(days=days_back * 2)).strftime("%d-%b-%Y")
+                else:
+                    date_since = (datetime.now() - timedelta(days=days_back)).strftime("%d-%b-%Y")
                 search_criteria.append(f'SINCE "{date_since}"')
             
             search_string = " ".join(search_criteria) if search_criteria else "ALL"
