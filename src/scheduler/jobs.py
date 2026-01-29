@@ -4,6 +4,7 @@ Handles email scanning and processing tasks.
 """
 
 import time
+import random
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
@@ -20,6 +21,8 @@ from src.utils.logger import get_logger
 def run_email_scan() -> bool:
     """
     Run a complete email scan and processing job.
+    Scans up to 50 emails from random dates, filters by priority senders,
+    randomly selects 3 emails, and generates blog content.
     
     Returns:
         bool: True if scan completed successfully, False otherwise
@@ -28,12 +31,11 @@ def run_email_scan() -> bool:
     config = get_config()
     
     try:
-        logger.info("Starting email scan...")
+        logger.info("Starting email scan for Software Engineering blog content...")
         
         # Initialize components
         connector = GmailConnector()
         filter_engine = EmailFilter()
-        categorizer = EmailCategorizer()
         content_analyzer = ContentAnalyzer()
         topic_generator = TopicGenerator()
         email_sender = EmailSender()
@@ -44,12 +46,14 @@ def run_email_scan() -> bool:
             return False
         
         try:
-            # Fetch emails
+            # Fetch up to 50 emails from random dates (use wider date range)
+            logger.info("Fetching up to 50 emails from random dates...")
             emails = connector.fetch_emails(
                 folder="INBOX",
-                limit=config.email.max_emails_per_scan,
-                days_back=config.email.days_back,
-                unread_only=config.email.scan_unread_only
+                limit=50,
+                days_back=30,  # Look back 30 days for more variety
+                unread_only=False,
+                random_dates=True
             )
             
             if not emails:
@@ -58,51 +62,69 @@ def run_email_scan() -> bool:
             
             logger.info(f"Found {len(emails)} emails to process")
             
-            # Filter and categorize emails
-            categorized_emails = filter_engine.filter_emails(emails)
+            # Filter emails by priority senders (Software Engineering newsletters)
+            priority_emails = filter_engine.filter_by_priority_senders(emails)
             
-            # Get statistics
-            stats = filter_engine.get_category_statistics(categorized_emails)
-            logger.info(f"Email categorization complete: {stats}")
+            if not priority_emails:
+                logger.info("No emails found from priority senders")
+                # Fall back to filtering by Software Engineering keywords
+                categorized_emails = filter_engine.filter_emails(emails)
+                priority_emails = []
+                for category, email_list in categorized_emails.items():
+                    if category == 'tech':
+                        for email_result in email_list:
+                            email_data = email_result['email_data']
+                            analysis = content_analyzer.analyze_email_content(email_data)
+                            if content_analyzer.should_process_for_topics(email_data, analysis):
+                                priority_emails.append(email_data)
             
-            # Process emails for topic generation
-            processed_emails = []
-            for category, email_list in categorized_emails.items():
-                if category in ['tech', 'newsletter', 'professional']:
-                    for email_result in email_list:
-                        email_data = email_result['email_data']
-                        
-                        # Analyze email content
-                        analysis = content_analyzer.analyze_email_content(email_data)
-                        
-                        # Check if email should be processed for topics
-                        if content_analyzer.should_process_for_topics(email_data, analysis):
-                            report = content_analyzer.create_email_report(email_data, analysis)
-                            processed_emails.append(report)
-                            
-                            logger.info(f"Email ready for topic generation: {report['subject']}")
+            logger.info(f"Found {len(priority_emails)} emails from priority senders or matching Software Engineering criteria")
             
-            logger.info(f"Processed {len(processed_emails)} emails for topic generation")
+            if len(priority_emails) == 0:
+                logger.info("No suitable emails found for blog generation")
+                return True
             
-            # Generate topics using AI
-            if processed_emails:
-                logger.info("Generating topics using AI...")
-                topics = topic_generator.generate_topics(processed_emails)
+            # Randomly select 3 emails
+            num_to_select = min(3, len(priority_emails))
+            selected_emails = random.sample(priority_emails, num_to_select)
+            
+            logger.info(f"Randomly selected {len(selected_emails)} emails for blog generation")
+            
+            # Generate blog content for each selected email
+            blog_posts = []
+            for i, email_data in enumerate(selected_emails, 1):
+                logger.info(f"Generating blog content for email {i}/{len(selected_emails)}: {email_data.get('subject', 'No subject')}")
                 
-                if topics:
-                    logger.info(f"Generated {len(topics)} topics")
-                    
-                    # Send email with generated topics
-                    if config.notifications.email_notifications and config.notifications.notification_email:
-                        success = send_topics_email(email_sender, topics, config.notifications.notification_email, processed_emails)
-                        if success:
-                            logger.info("Topics email sent successfully")
-                        else:
-                            logger.error("Failed to send topics email")
+                try:
+                    blog_content = topic_generator.generate_blog_content(email_data)
+                    if blog_content and not blog_content.get('error'):
+                        blog_posts.append(blog_content)
+                        logger.info(f"Successfully generated blog: {blog_content.get('title', 'Untitled')}")
+                    else:
+                        logger.warning(f"Failed to generate blog content for email: {email_data.get('subject', 'No subject')}")
+                except Exception as e:
+                    logger.error(f"Error generating blog content: {e}")
+                    continue
+            
+            if blog_posts:
+                logger.info(f"Generated {len(blog_posts)} blog posts")
+                
+                # Send email with blog posts
+                if config.notifications.email_notifications and config.notifications.notification_email:
+                    success = send_blog_posts_email(
+                        email_sender, 
+                        blog_posts, 
+                        config.notifications.notification_email,
+                        selected_emails
+                    )
+                    if success:
+                        logger.info("Blog posts email sent successfully")
+                    else:
+                        logger.error("Failed to send blog posts email")
                 else:
-                    logger.info("No topics generated")
+                    logger.warning("Email notifications not configured")
             else:
-                logger.info("No emails suitable for topic generation")
+                logger.info("No blog posts generated")
             
             return True
             
@@ -201,6 +223,151 @@ def get_scan_statistics() -> Dict[str, Any]:
             "last_scan": datetime.now().isoformat(),
             "connection_status": "error"
         }
+
+
+def send_blog_posts_email(email_sender: EmailSender, blog_posts: List[Dict[str, Any]], recipient: str, source_emails: List[Dict[str, Any]] = None) -> bool:
+    """
+    Send an email with generated blog posts (titles and content).
+    
+    Args:
+        email_sender: Email sender instance
+        blog_posts: List of generated blog posts with title and content
+        recipient: Email address to send to
+        source_emails: List of source emails used for blog generation
+        
+    Returns:
+        True if email sent successfully, False otherwise
+    """
+    try:
+        subject = f"📝 Software Engineering Blog Posts - {datetime.now().strftime('%Y-%m-%d')}"
+        
+        # Format blog posts as HTML
+        html_body = format_blog_posts_as_html(blog_posts, source_emails)
+        
+        return email_sender.send_email(
+            to=recipient,
+            subject=subject,
+            body=html_body,
+            body_type='html'
+        )
+        
+    except Exception as e:
+        logger = get_logger("blog_email")
+        logger.error(f"Error sending blog posts email: {e}")
+        return False
+
+
+def format_blog_posts_as_html(blog_posts: List[Dict[str, Any]], source_emails: List[Dict[str, Any]] = None) -> str:
+    """Format blog posts as HTML for email."""
+    try:
+        html_parts = [
+            """
+            <html>
+            <body style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+                <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <h1 style="color: #1976d2; border-bottom: 3px solid #1976d2; padding-bottom: 15px; margin-bottom: 30px;">
+                        🚀 Software Engineering Blog Posts
+                    </h1>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 30px;">
+                        Generated on: """ + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + """
+                    </p>
+            """
+        ]
+        
+        # Add each blog post
+        for i, blog_post in enumerate(blog_posts, 1):
+            title = blog_post.get('title', 'Untitled Blog Post')
+            content = blog_post.get('content', 'No content available')
+            source_email = blog_post.get('source_email', 'Unknown')
+            source_subject = blog_post.get('source_subject', 'No subject')
+            
+            # Format content with basic HTML (preserve line breaks)
+            # Split by double newlines for paragraphs
+            paragraphs = content.split('\n\n')
+            formatted_paragraphs = []
+            for para in paragraphs:
+                if para.strip():
+                    # Replace single newlines with <br> within paragraphs
+                    para = para.replace('\n', '<br>')
+                    formatted_paragraphs.append(f'<p style="margin: 10px 0; line-height: 1.6; color: #333;">{para}</p>')
+            
+            formatted_content = '\n'.join(formatted_paragraphs) if formatted_paragraphs else f'<p style="margin: 10px 0; line-height: 1.6; color: #333;">{content.replace(chr(10), "<br>")}</p>'
+            
+            html_parts.append(f"""
+                <div style="background-color: #f8f9fa; border-left: 5px solid #1976d2; 
+                           padding: 25px; margin: 30px 0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <h2 style="color: #1976d2; margin-top: 0; font-size: 24px; line-height: 1.3;">
+                        Blog Post {i}: {title}
+                    </h2>
+                    <div style="background-color: white; padding: 20px; border-radius: 6px; margin: 15px 0;">
+                        {formatted_content}
+                    </div>
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
+                        <p style="color: #666; font-size: 12px; margin: 5px 0;">
+                            <strong>📧 Source Email:</strong> {source_email}
+                        </p>
+                        <p style="color: #666; font-size: 12px; margin: 5px 0;">
+                            <strong>📌 Original Subject:</strong> {source_subject}
+                        </p>
+                    </div>
+                </div>
+            """)
+        
+        # Add source email details section
+        if source_emails:
+            html_parts.append("""
+                <hr style="margin: 40px 0; border: none; border-top: 2px solid #ddd;">
+                <h2 style="color: #333; border-bottom: 2px solid #1976d2; padding-bottom: 10px;">
+                    📧 Source Emails Used
+                </h2>
+                <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
+                    The following emails were used to generate these blog posts:
+                </p>
+            """)
+            
+            for i, email in enumerate(source_emails, 1):
+                email_date = email.get('date', '')
+                try:
+                    from email.utils import parsedate_to_datetime
+                    parsed_date = parsedate_to_datetime(email_date)
+                    formatted_date = parsed_date.strftime('%Y-%m-%d %H:%M:%S')
+                except:
+                    formatted_date = email_date
+                
+                sender = email.get('from', 'Unknown')
+                subject = email.get('subject', 'No Subject')
+                
+                html_parts.append(f"""
+                    <div style="background-color: #f8f9fa; border-left: 4px solid #4caf50; 
+                               padding: 15px; margin: 10px 0; border-radius: 6px;">
+                        <h3 style="color: #333; margin: 0 0 8px 0; font-size: 16px;">
+                            {i}. {subject}
+                        </h3>
+                        <p style="color: #666; margin: 5px 0; font-size: 14px;">
+                            <strong>From:</strong> {sender}
+                        </p>
+                        <p style="color: #666; margin: 5px 0; font-size: 14px;">
+                            <strong>Received:</strong> {formatted_date}
+                        </p>
+                    </div>
+                """)
+        
+        html_parts.append("""
+                </div>
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
+                <p style="color: #999; font-size: 12px; text-align: center;">
+                    Generated by Email Scanner & Blog Content Generator
+                </p>
+            </body>
+            </html>
+        """)
+        
+        return "\n".join(html_parts)
+        
+    except Exception as e:
+        logger = get_logger("blog_formatting")
+        logger.error(f"Error formatting blog posts as HTML: {e}")
+        return f"<p>Error formatting blog posts: {e}</p>"
 
 
 def send_topics_email(email_sender: EmailSender, topics: List[Dict[str, Any]], recipient: str, source_emails: List[Dict[str, Any]] = None) -> bool:

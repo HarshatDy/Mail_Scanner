@@ -8,13 +8,15 @@ import os
 import sys
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
+from pathlib import Path
 
-# Add the src directory to the path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+# Add the project root to the Python path
+project_root = Path(__file__).parent
+sys.path.insert(0, str(project_root))
 
-from config.config_manager import get_config
-from email_processing.sender import EmailSender
-from utils.logger import get_logger
+from src.config.config_manager import get_config
+from src.email_processing.sender import EmailSender
+from src.utils.logger import get_logger
 
 def create_sample_emails() -> List[Dict[str, Any]]:
     """Create sample email data for testing."""
@@ -131,7 +133,7 @@ def test_updated_email_report():
             return False
         
         # Test the full topics email functionality
-        from scheduler.jobs import send_topics_email
+        from src.scheduler.jobs import send_topics_email
         
         success = send_topics_email(
             email_sender=email_sender,

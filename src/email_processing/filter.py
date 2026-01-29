@@ -19,6 +19,15 @@ class EmailFilter:
         self.config = get_config()
         self.logger = get_logger("email_filter")
         
+        # Specific email addresses to prioritize
+        self.priority_senders = [
+            'avi@dailydoseofds.com',
+            'bytebytego@substack.com',
+            'newsletter@thedeepview.com',
+            'systemdesignone@substack.com',
+            'newsletter@hw-mail.glich.com'
+        ]
+        
         # Predefined category patterns
         self.category_patterns = {
             'tech': {
@@ -154,13 +163,26 @@ class EmailFilter:
             from_address = email_data.get('from', '').lower()
             body = email_data.get('body', '').lower()
             
-            # Check if email should be excluded
-            if self._should_exclude_email(from_address, subject, body):
+            # Check if email is from priority senders
+            is_priority_sender = self._is_priority_sender(from_address)
+            
+            # Check if email should be excluded (but allow priority senders)
+            if not is_priority_sender and self._should_exclude_email(from_address, subject, body):
                 return {
                     'category': 'excluded',
                     'confidence': 1.0,
                     'reason': 'Matched exclusion criteria',
                     'email_data': email_data
+                }
+            
+            # If from priority sender, automatically categorize as tech/newsletter
+            if is_priority_sender:
+                return {
+                    'category': 'tech',
+                    'confidence': 1.0,
+                    'reason': 'From priority sender',
+                    'email_data': email_data,
+                    'is_priority_sender': True
                 }
             
             # Categorize the email
@@ -282,6 +304,31 @@ class EmailFilter:
         # Remove special characters and split into words
         words = re.findall(r'\b\w+\b', text.lower())
         return [word for word in words if len(word) > 2]  # Filter out short words
+    
+    def _is_priority_sender(self, from_address: str) -> bool:
+        """Check if email is from a priority sender."""
+        from_address_lower = from_address.lower()
+        for priority_sender in self.priority_senders:
+            if priority_sender.lower() in from_address_lower:
+                return True
+        return False
+    
+    def filter_by_priority_senders(self, emails: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter emails to only include those from priority senders.
+        
+        Args:
+            emails: List of email dictionaries
+            
+        Returns:
+            List of emails from priority senders
+        """
+        filtered_emails = []
+        for email_data in emails:
+            from_address = email_data.get('from', '').lower()
+            if self._is_priority_sender(from_address):
+                filtered_emails.append(email_data)
+        return filtered_emails
     
     def filter_emails(self, emails: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
         """

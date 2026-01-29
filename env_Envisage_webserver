@@ -1,0 +1,21 @@
+MONGODB_URI=mongodb+srv://dhanayatharshat:envisagedb01@envisagedb01.7zmo7.mongodb.net/
+MONGODB_DB=claude_api
+NEXT_PUBLIC_API_URL=https://api.summariseme.in
+
+# NextAuth Configuration
+NEXTAUTH_URL=https://summariseme.in
+NEXTAUTH_SECRET=yZ\Ld76kIuWo3NGzsruHM3RrIKaVxDenXJOiOxa4Vrw=
+DEBUG_AUTH=false
+
+# Google OAuth
+GOOGLE_CLIENT_ID=1052645162123-iqafqndcb5olfcvfi7rvo585756alf0a.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=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
+
+PROJECT_ID=1052645162123
+BUCKET_NAME=envisagewebmeta
+KEYFILENAME="web-envisage-8ab619eee6a6.json"
+
+NODE_ENV=production
+
+GITHUB_ID=Ov23ct43AlQzYjQFiLjf
+GITHUB_SECRET=6ae13dc695edc2d45f650cd0fe259370b05d1821  

@@ -97,7 +97,8 @@ class GmailAPIConnector:
                     query: str = "in:inbox",
                     limit: int = 50,
                     days_back: int = 7,
-                    unread_only: bool = False) -> List[Dict[str, Any]]:
+                    unread_only: bool = False,
+                    random_dates: bool = False) -> List[Dict[str, Any]]:
         """
         Fetch emails from Gmail using the API.
         
@@ -124,8 +125,14 @@ class GmailAPIConnector:
                 search_query += " is:unread"
             
             if days_back > 0:
-                date_since = (datetime.now() - timedelta(days=days_back)).strftime("%Y/%m/%d")
-                search_query += f" after:{date_since}"
+                if random_dates:
+                    # For random dates, we'll fetch from a wider range and then sample
+                    # Use a larger days_back to get more emails to choose from
+                    date_since = (datetime.now() - timedelta(days=days_back * 2)).strftime("%Y/%m/%d")
+                    search_query += f" after:{date_since}"
+                else:
+                    date_since = (datetime.now() - timedelta(days=days_back)).strftime("%Y/%m/%d")
+                    search_query += f" after:{date_since}"
             
             self.logger.info(f"Searching emails with query: {search_query}")
             

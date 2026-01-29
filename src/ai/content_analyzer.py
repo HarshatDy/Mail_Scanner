@@ -18,15 +18,44 @@ class ContentAnalyzer:
         self.config = get_config()
         self.logger = get_logger("content_analyzer")
         
-        # Keywords that indicate relevant content
+        # Software Engineering keywords - System Design, Design Patterns, Programming Languages
         self.tech_keywords = [
-            'python', 'javascript', 'react', 'vue', 'angular', 'node.js', 'docker',
-            'kubernetes', 'aws', 'azure', 'gcp', 'machine learning', 'ai', 'ml',
-            'data science', 'blockchain', 'cybersecurity', 'devops', 'api',
-            'database', 'sql', 'nosql', 'git', 'github', 'agile', 'scrum',
-            'testing', 'deployment', 'microservices', 'serverless', 'cloud',
-            'programming', 'coding', 'development', 'software', 'web', 'mobile',
-            'startup', 'entrepreneurship', 'productivity', 'tools', 'automation'
+            # Programming Languages
+            'python', 'javascript', 'typescript', 'java', 'c++', 'c#', 'go', 'rust', 
+            'kotlin', 'swift', 'ruby', 'php', 'scala', 'r', 'matlab', 'perl',
+            'react', 'vue', 'angular', 'node.js', 'django', 'flask', 'spring',
+            'express', 'laravel', 'rails', 'asp.net', 'dotnet',
+            
+            # System Design
+            'system design', 'distributed systems', 'microservices', 'monolith',
+            'scalability', 'load balancing', 'caching', 'cdn', 'database sharding',
+            'replication', 'consistency', 'availability', 'partition tolerance', 'cap theorem',
+            'api design', 'rest api', 'graphql', 'grpc', 'message queue', 'kafka',
+            'rabbitmq', 'event-driven', 'pub-sub', 'service mesh', 'api gateway',
+            
+            # Design Patterns
+            'design pattern', 'singleton', 'factory', 'observer', 'strategy', 'adapter',
+            'decorator', 'facade', 'proxy', 'command', 'mvc', 'mvp', 'mvvm',
+            'repository pattern', 'dependency injection', 'builder pattern',
+            'creational pattern', 'structural pattern', 'behavioral pattern',
+            
+            # Architecture & Infrastructure
+            'docker', 'kubernetes', 'containerization', 'orchestration', 'aws', 'azure', 
+            'gcp', 'cloud', 'serverless', 'lambda', 'devops', 'ci/cd', 'jenkins',
+            'git', 'github', 'gitlab', 'version control', 'agile', 'scrum',
+            'testing', 'unit test', 'integration test', 'tdd', 'bdd',
+            'deployment', 'infrastructure', 'monitoring', 'logging', 'observability',
+            
+            # Data & Database
+            'database', 'sql', 'nosql', 'mongodb', 'postgresql', 'mysql', 'redis',
+            'cassandra', 'dynamodb', 'data modeling', 'orm', 'query optimization',
+            'data structure', 'algorithm', 'big o', 'time complexity', 'space complexity',
+            
+            # Software Engineering Concepts
+            'refactoring', 'code review', 'clean code', 'solid principles', 'dry',
+            'kiss', 'yagni', 'software architecture', 'domain-driven design', 'ddd',
+            'test-driven development', 'continuous integration', 'code quality',
+            'technical debt', 'code smell', 'best practices', 'coding standards'
         ]
         
         self.newsletter_keywords = [

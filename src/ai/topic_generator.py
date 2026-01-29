@@ -8,8 +8,20 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-import google.generativeai as genai
-from openai import OpenAI
+# Lazy imports to avoid Python 3.14 compatibility issues
+genai = None
+OpenAI = None
+
+try:
+    import google.generativeai as genai
+except (ImportError, TypeError) as e:
+    # Handle Python 3.14 compatibility issue with protobuf
+    genai = None
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
 
 from src.config.config_manager import get_config
 from src.utils.logger import get_logger
@@ -31,6 +43,9 @@ class TopicGenerator:
         """Setup AI providers based on configuration."""
         try:
             if self.config.ai.provider == "gemini":
+                if genai is None:
+                    self.logger.error("google.generativeai could not be imported. This may be due to Python 3.14 compatibility issues. Please use Python 3.11 or 3.12, or update protobuf/google-generativeai packages.")
+                    return
                 if self.config.ai.gemini_api_key:
                     genai.configure(api_key=self.config.ai.gemini_api_key)
                     self.gemini_model = genai.GenerativeModel(self.config.ai.model)
@@ -39,6 +54,9 @@ class TopicGenerator:
                     self.logger.warning("Gemini API key not configured")
                     
             elif self.config.ai.provider == "openai":
+                if OpenAI is None:
+                    self.logger.error("openai package could not be imported. Please install it with: pip install openai")
+                    return
                 if self.config.ai.openai_api_key:
                     self.openai_client = OpenAI(api_key=self.config.ai.openai_api_key)
                     self.logger.info("OpenAI provider initialized")
@@ -165,6 +183,9 @@ class TopicGenerator:
     def _generate_with_gemini(self, category: str, content_summary: str) -> List[Dict[str, Any]]:
         """Generate topics using Gemini API."""
         try:
+            if genai is None:
+                self.logger.error("google.generativeai is not available. Please use Python 3.11/3.12 or fix the import issue.")
+                return []
             if not self.gemini_model:
                 self.logger.error("Gemini model not initialized")
                 return []
@@ -188,6 +209,9 @@ class TopicGenerator:
     def _generate_with_openai(self, category: str, content_summary: str) -> List[Dict[str, Any]]:
         """Generate topics using OpenAI API."""
         try:
+            if OpenAI is None:
+                self.logger.error("openai package is not available. Please install it with: pip install openai")
+                return []
             if not self.openai_client:
                 self.logger.error("OpenAI client not initialized")
                 return []
@@ -294,10 +318,171 @@ class TopicGenerator:
             self.logger.error(f"Error parsing OpenAI response: {e}")
             return []
     
+    def generate_blog_content(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generate a complete blog post (title and content) from a single email.
+        
+        Args:
+            email_data: Dictionary containing email information
+            
+        Returns:
+            Dictionary with blog title and content
+        """
+        try:
+            subject = email_data.get('subject', '')
+            body = email_data.get('body', '')
+            sender = email_data.get('from', '')
+            
+            # Prepare content for AI
+            email_content = f"Subject: {subject}\n\nContent: {body[:2000]}"  # Limit content length
+            
+            # Generate blog content using AI
+            if self.config.ai.provider == "gemini":
+                blog_data = self._generate_blog_with_gemini(email_content, sender)
+            elif self.config.ai.provider == "openai":
+                blog_data = self._generate_blog_with_openai(email_content, sender)
+            else:
+                self.logger.warning(f"Unknown AI provider: {self.config.ai.provider}")
+                return {
+                    'title': subject,
+                    'content': body,
+                    'source_email': sender,
+                    'error': 'Unknown AI provider'
+                }
+            
+            # Add source email information
+            blog_data['source_email'] = sender
+            blog_data['source_subject'] = subject
+            blog_data['generated_at'] = datetime.now().isoformat()
+            
+            return blog_data
+            
+        except Exception as e:
+            self.logger.error(f"Error generating blog content: {e}")
+            return {
+                'title': email_data.get('subject', 'Untitled'),
+                'content': email_data.get('body', ''),
+                'source_email': email_data.get('from', ''),
+                'error': str(e)
+            }
+    
+    def _generate_blog_with_gemini(self, email_content: str, sender: str) -> Dict[str, Any]:
+        """Generate blog content using Gemini API."""
+        try:
+            if genai is None:
+                self.logger.error("google.generativeai is not available. Please use Python 3.11/3.12 or fix the import issue.")
+                return {'title': '', 'content': '', 'error': 'Gemini library not available'}
+            if not self.gemini_model:
+                self.logger.error("Gemini model not initialized")
+                return {'title': '', 'content': '', 'error': 'Model not initialized'}
+            
+            prompt = self._create_blog_prompt(email_content, sender)
+            
+            response = self.gemini_model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=self.config.ai.temperature,
+                    max_output_tokens=self.config.ai.max_tokens * 3  # More tokens for full content
+                )
+            )
+            
+            return self._parse_blog_response(response.text)
+            
+        except Exception as e:
+            self.logger.error(f"Error generating blog with Gemini: {e}")
+            return {'title': '', 'content': '', 'error': str(e)}
+    
+    def _generate_blog_with_openai(self, email_content: str, sender: str) -> Dict[str, Any]:
+        """Generate blog content using OpenAI API."""
+        try:
+            if OpenAI is None:
+                self.logger.error("openai package is not available. Please install it with: pip install openai")
+                return {'title': '', 'content': '', 'error': 'OpenAI library not available'}
+            if not self.openai_client:
+                self.logger.error("OpenAI client not initialized")
+                return {'title': '', 'content': '', 'error': 'Client not initialized'}
+            
+            prompt = self._create_blog_prompt(email_content, sender)
+            
+            response = self.openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a technical blog writer specializing in Software Engineering topics."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=self.config.ai.max_tokens * 3,  # More tokens for full content
+                temperature=self.config.ai.temperature
+            )
+            
+            return self._parse_blog_response(response.choices[0].message.content)
+            
+        except Exception as e:
+            self.logger.error(f"Error generating blog with OpenAI: {e}")
+            return {'title': '', 'content': '', 'error': str(e)}
+    
+    def _create_blog_prompt(self, email_content: str, sender: str) -> str:
+        """Create a prompt for blog content generation."""
+        return f"""
+        Based on the following email content from {sender}, create a complete blog post about Software Engineering topics.
+        
+        Email Content:
+        {email_content}
+        
+        Please create:
+        1. A catchy, SEO-friendly blog title (focused on Software Engineering, System Design, Design Patterns, or Programming)
+        2. A well-structured blog post content (at least 500 words) that:
+           - Expands on the key concepts from the email
+           - Includes relevant Software Engineering topics (system design, design patterns, programming languages, etc.)
+           - Is educational and informative
+           - Has clear sections with headings
+           - Includes practical examples or explanations
+           - Is suitable for a technical blog audience
+        
+        Format your response as JSON:
+        {{
+            "title": "Blog Title Here",
+            "content": "Full blog post content here with proper formatting and sections..."
+        }}
+        
+        Only return valid JSON, no additional text.
+        """
+    
+    def _parse_blog_response(self, response_text: str) -> Dict[str, Any]:
+        """Parse AI response into blog title and content."""
+        try:
+            # Clean the response text
+            response_text = response_text.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            if response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+            
+            response_data = json.loads(response_text)
+            return {
+                'title': response_data.get('title', 'Untitled'),
+                'content': response_data.get('content', '')
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error parsing blog response: {e}")
+            # Try to extract title and content manually
+            lines = response_text.split('\n')
+            title = lines[0] if lines else 'Untitled'
+            content = '\n'.join(lines[1:]) if len(lines) > 1 else response_text
+            return {
+                'title': title.replace('#', '').strip(),
+                'content': content
+            }
+    
     def test_connection(self) -> bool:
         """Test the AI provider connection."""
         try:
             if self.config.ai.provider == "gemini":
+                if genai is None:
+                    self.logger.error("google.generativeai is not available")
+                    return False
                 if not self.gemini_model:
                     self.logger.error("Gemini model not initialized")
                     return False
@@ -307,6 +492,9 @@ class TopicGenerator:
                 return response.text is not None
                 
             elif self.config.ai.provider == "openai":
+                if OpenAI is None:
+                    self.logger.error("openai package is not available")
+                    return False
                 if not self.openai_client:
                     self.logger.error("OpenAI client not initialized")
                     return False
