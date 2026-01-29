@@ -71,8 +71,8 @@ ai:
 scheduler:
   scan_times:
     - "07:18"
-    - "10:24"
-    - "22:36"
+    - "03:50"
+    - "21:00"
   timezone: Asia/Kolkata
   max_retries: 3
   retry_delay: 300
